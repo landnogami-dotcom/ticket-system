@@ -1,16 +1,29 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { addReservation } from "@/lib/reservation";
+import { db } from "@/lib/firebase";
+import { collection, getDocs } from "firebase/firestore";
 
 export default function Home() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [address, setAddress] = useState("");
   const [event, setEvent] = useState("");
+  const [events, setEvents] = useState<string[]>([]);
   const [ticketType, setTicketType] = useState("一般");
   const [quantity, setQuantity] = useState(1);
   const [loading, setLoading] = useState(false);
+
+  // Firebaseから公演取得
+  useEffect(() => {
+    const fetchEvents = async () => {
+      const snapshot = await getDocs(collection(db, "events"));
+      const list = snapshot.docs.map((doc) => doc.data().name);
+      setEvents(list);
+    };
+    fetchEvents();
+  }, []);
 
   const handleSubmit = async () => {
     if (!name) return alert("お名前を入力してください");
@@ -20,7 +33,12 @@ export default function Home() {
     try {
       await addReservation({ name, email, address, event, ticketType, quantity });
       alert("予約を受け付けました！");
-      setName(""); setEmail(""); setAddress(""); setEvent(""); setTicketType("一般"); setQuantity(1);
+      setName("");
+      setEmail("");
+      setAddress("");
+      setEvent("");
+      setTicketType("一般");
+      setQuantity(1);
     } catch (e: any) {
       console.error(e);
       alert("エラーが発生しました: " + e.message);
@@ -33,17 +51,30 @@ export default function Home() {
     <div style={{ maxWidth: 400, margin: "40px auto" }}>
       <h1>チケット予約</h1>
 
-      <div><p>お名前</p><input value={name} onChange={e => setName(e.target.value)} style={{ width: "100%", padding: 8, marginBottom: 8 }} /></div>
-      <div><p>メール</p><input value={email} onChange={e => setEmail(e.target.value)} style={{ width: "100%", padding: 8, marginBottom: 8 }} /></div>
-      <div><p>住所（任意）</p><input value={address} onChange={e => setAddress(e.target.value)} style={{ width: "100%", padding: 8, marginBottom: 8 }} /></div>
+      <div>
+        <p>お名前</p>
+        <input value={name} onChange={e => setName(e.target.value)} style={{ width: "100%", padding: 8, marginBottom: 8 }} />
+      </div>
+
+      <div>
+        <p>メール</p>
+        <input value={email} onChange={e => setEmail(e.target.value)} style={{ width: "100%", padding: 8, marginBottom: 8 }} />
+      </div>
+
+      <div>
+        <p>住所（任意）</p>
+        <input value={address} onChange={e => setAddress(e.target.value)} style={{ width: "100%", padding: 8, marginBottom: 8 }} />
+      </div>
 
       <div>
         <p>公演</p>
         <select value={event} onChange={e => setEvent(e.target.value)} style={{ width: "100%", padding: 8, marginBottom: 8 }}>
           <option value="">公演を選択</option>
-          <option value="広島ライブ">広島ライブ</option>
-          <option value="大阪ライブ">大阪ライブ</option>
-          <option value="東京ライブ">東京ライブ</option>
+          {events.map((ev, index) => (
+            <option key={index} value={ev}>
+              {ev}
+            </option>
+          ))}
         </select>
       </div>
 
@@ -55,7 +86,10 @@ export default function Home() {
         </select>
       </div>
 
-      <div><p>枚数</p><input type="number" value={quantity} onChange={e => setQuantity(Number(e.target.value))} style={{ width: "100%", padding: 8, marginBottom: 8 }} /></div>
+      <div>
+        <p>枚数</p>
+        <input type="number" value={quantity} onChange={e => setQuantity(Number(e.target.value))} style={{ width: "100%", padding: 8, marginBottom: 8 }} />
+      </div>
 
       <button onClick={handleSubmit} disabled={loading} style={{ width: "100%", padding: 10 }}>
         {loading ? "送信中..." : "予約する"}
@@ -63,7 +97,3 @@ export default function Home() {
     </div>
   );
 }
-
-
-
-
