@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { addReservation } from "@/lib/reservation";
+import { addReservation, deleteReservation } from "@/lib/reservation";
 import { db } from "@/firebase";
 import { collection, getDocs } from "firebase/firestore";
 
@@ -37,6 +37,11 @@ export default function Home() {
     fetchReservations();
   };
 
+  const handleDelete = async (id: string) => {
+    await deleteReservation(id);
+    fetchReservations();
+  };
+
   return (
     <main style={{ padding: 20 }}>
       <h1>予約フォーム</h1>
@@ -66,7 +71,8 @@ export default function Home() {
       <ul>
         {reservations.map((r) => (
           <li key={r.id}>
-            {r.name} / {r.tickets}枚
+            {r.name} / {r.tickets}枚{" "}
+            <button onClick={() => handleDelete(r.id)}>削除</button>
           </li>
         ))}
       </ul>
