@@ -1,25 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { addReservation, getReservations, deleteReservation } from "@/lib/reservation";
+import { useState } from "react";
+import { addReservation } from "@/lib/reservation";
 
 export default function Home() {
   const [name, setName] = useState("");
   const [event, setEvent] = useState("");
   const [tickets, setTickets] = useState(1);
-  const [reservations, setReservations] = useState<any[]>([]);
 
-  // 🔄 予約一覧取得
-  const loadReservations = async () => {
-    const data = await getReservations();
-    setReservations(data);
-  };
-
-  useEffect(() => {
-    loadReservations();
-  }, []);
-
-  // 📨 送信
   const handleSubmit = async () => {
     if (!name) return alert("名前を入力してください");
     if (!event) return alert("公演を選択してください");
@@ -30,16 +18,10 @@ export default function Home() {
       tickets,
     });
 
+    alert("予約を受け付けました！");
     setName("");
     setEvent("");
     setTickets(1);
-    loadReservations();
-  };
-
-  // 🗑 削除
-  const handleDelete = async (id: string) => {
-    await deleteReservation(id);
-    loadReservations();
   };
 
   return (
@@ -82,21 +64,6 @@ export default function Home() {
       <button onClick={handleSubmit} style={{ width: "100%", padding: 10 }}>
         予約する
       </button>
-
-      <hr style={{ margin: "30px 0" }} />
-
-      <h2>予約一覧</h2>
-      {reservations.map((r) => (
-        <div key={r.id} style={{ marginBottom: 10 }}>
-          {r.name} / {r.event} / {r.tickets}枚
-          <button
-            onClick={() => handleDelete(r.id)}
-            style={{ marginLeft: 10 }}
-          >
-            削除
-          </button>
-        </div>
-      ))}
     </div>
   );
 }
