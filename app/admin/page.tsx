@@ -1,85 +1,86 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { db } from "@/firebase";
-import {
-  collection,
-  addDoc,
-  getDocs,
-} from "firebase/firestore";
+import { db } from "../../firebase";
+import { collection, addDoc, getDocs } from "firebase/firestore";
 
-export default function AdminPage() {
-  const [title, setTitle] = useState("");
-  const [date, setDate] = useState("");
+export default function Home() {
+  const [name, setName] = useState("");
+  const [show, setShow] = useState("");
+  const [count, setCount] = useState(1);
   const [shows, setShows] = useState<any[]>([]);
 
-  const showsRef = collection(db, "shows");
-
-  const fetchShows = async () => {
-    const snapshot = await getDocs(showsRef);
-    const list = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
-    setShows(list);
-  };
-
+  // 🔥 公演一覧をFirestoreから取得
   useEffect(() => {
+    const fetchShows = async () => {
+      const snapshot = await getDocs(collection(db, "shows"));
+      const list = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setShows(list);
+    };
+
     fetchShows();
   }, []);
 
-  const addShow = async () => {
-    if (!title || !date) {
-      alert("入力してください");
-      return;
-    }
+  const handleSubmit = async (e: any) => {
+    e.preventDefault();
 
-    await addDoc(showsRef, {
-      title,
-      date,
+    await addDoc(collection(db, "reservations"), {
+      name,
+      show,
+      count,
+      createdAt: new Date(),
     });
 
-    setTitle("");
-    setDate("");
-
-    fetchShows();
+    alert("予約完了しました！");
+    setName("");
+    setShow("");
+    setCount(1);
   };
 
   return (
-    <div style={{ padding: 20 }}>
-      <h1>管理ページ</h1>
+    <main style={{ padding: 20 }}>
+      <h1>予約フォーム</h1>
 
-      <h2>公演追加</h2>
-
-      <input
-        placeholder="公演名"
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-      />
-
-      <br /><br />
-
-      <input
-        type="date"
-        value={date}
-        onChange={(e) => setDate(e.target.value)}
-      />
-
-      <br /><br />
-
-      <button onClick={addShow}>
-        公演追加
-      </button>
-
-      <hr />
-
-      <h2>登録済み公演</h2>
-
-      {shows.map((show) => (
-        <div key={show.id}>
-          {show.title} / {show.date}
+      <form onSubmit={handleSubmit}>
+        <div>
+          <input
+            placeholder="お名前"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+          />
         </div>
-      ))}
-    </div>
+
+        <div>
+          <select
+            value={show}
+            onChange={(e) => setShow(e.target.value)}
+            required
+          >
+            <option value="">公演を選択</option>
+
+            {shows.map((s) => (
+              <option key={s.id} value={s.name}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <input
+            type="number"
+            value={count}
+            onChange={(e) => setCount(Number(e.target.value))}
+            min={1}
+          />
+        </div>
+
+        <button type="submit">予約する</button>
+      </form>
+    </main>
   );
 }
