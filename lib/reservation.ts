@@ -11,6 +11,11 @@ export const addReservation = async (data: {
     createdAt: Timestamp.now(),
   });
 };
+import { doc, deleteDoc } from "firebase/firestore";
+
+export const deleteReservation = async (id: string) => {
+  await deleteDoc(doc(db, "reservations", id));
+};
 
 
 
