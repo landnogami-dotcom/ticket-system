@@ -1,82 +1,104 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { addReservation, deleteReservation } from "@/lib/reservation";
-import { db } from "@/firebase";
-import { collection, getDocs } from "firebase/firestore";
+import { addReservation, getReservations, deleteReservation } from "@/lib/reservation";
 
 export default function Home() {
   const [name, setName] = useState("");
+  const [event, setEvent] = useState("");
   const [tickets, setTickets] = useState(1);
   const [reservations, setReservations] = useState<any[]>([]);
 
-  const fetchReservations = async () => {
-    const snapshot = await getDocs(collection(db, "reservations"));
-    const list = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
-    setReservations(list);
+  // 🔄 予約一覧取得
+  const loadReservations = async () => {
+    const data = await getReservations();
+    setReservations(data);
   };
 
   useEffect(() => {
-    fetchReservations();
+    loadReservations();
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // 📨 送信
+  const handleSubmit = async () => {
+    if (!name) return alert("名前を入力してください");
+    if (!event) return alert("公演を選択してください");
 
     await addReservation({
       name,
+      event,
       tickets,
     });
 
     setName("");
+    setEvent("");
     setTickets(1);
-
-    fetchReservations();
+    loadReservations();
   };
 
+  // 🗑 削除
   const handleDelete = async (id: string) => {
     await deleteReservation(id);
-    fetchReservations();
+    loadReservations();
   };
 
   return (
-    <main style={{ padding: 20 }}>
+    <div style={{ maxWidth: 400, margin: "40px auto" }}>
       <h1>予約フォーム</h1>
 
-      <form onSubmit={handleSubmit}>
-        <div>
-          <input
-            placeholder="名前"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-        </div>
+      <div>
+        <p>名前</p>
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          style={{ width: "100%", padding: 8, marginBottom: 8 }}
+        />
+      </div>
 
-        <div>
-          <input
-            type="number"
-            value={tickets}
-            onChange={(e) => setTickets(Number(e.target.value))}
-          />
-        </div>
+      <div>
+        <p>公演</p>
+        <select
+          value={event}
+          onChange={(e) => setEvent(e.target.value)}
+          style={{ width: "100%", padding: 8, marginBottom: 8 }}
+        >
+          <option value="">公演を選択</option>
+          <option value="広島ライブ">広島ライブ</option>
+          <option value="大阪ライブ">大阪ライブ</option>
+          <option value="東京ライブ">東京ライブ</option>
+        </select>
+      </div>
 
-        <button type="submit">予約する</button>
-      </form>
+      <div>
+        <p>枚数</p>
+        <input
+          type="number"
+          value={tickets}
+          onChange={(e) => setTickets(Number(e.target.value))}
+          style={{ width: "100%", padding: 8, marginBottom: 8 }}
+        />
+      </div>
+
+      <button onClick={handleSubmit} style={{ width: "100%", padding: 10 }}>
+        予約する
+      </button>
+
+      <hr style={{ margin: "30px 0" }} />
 
       <h2>予約一覧</h2>
-
-      <ul>
-        {reservations.map((r) => (
-          <li key={r.id}>
-            {r.name} / {r.tickets}枚{" "}
-            <button onClick={() => handleDelete(r.id)}>削除</button>
-          </li>
-        ))}
-      </ul>
-    </main>
+      {reservations.map((r) => (
+        <div key={r.id} style={{ marginBottom: 10 }}>
+          {r.name} / {r.event} / {r.tickets}枚
+          <button
+            onClick={() => handleDelete(r.id)}
+            style={{ marginLeft: 10 }}
+          >
+            削除
+          </button>
+        </div>
+      ))}
+    </div>
   );
 }
+
 
