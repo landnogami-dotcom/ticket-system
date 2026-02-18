@@ -13,7 +13,9 @@ const COLLECTION_NAME = "reservations";
 export async function addReservation(data: {
   name: string;
   event: string;
-  tickets: number;
+  quantity: number;
+}) {
+
 }) {
   await addDoc(collection(db, COLLECTION_NAME), data);
 }

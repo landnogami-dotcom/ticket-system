@@ -2,85 +2,105 @@
 
 import { useEffect, useState } from "react";
 import { db } from "@/lib/firebase";
-import { collection, addDoc, getDocs } from "firebase/firestore";
+import { collection, addDoc, getDocs, deleteDoc, doc } from "firebase/firestore";
 
-export default function Home() {
-  const [name, setName] = useState("");
-  const [show, setShow] = useState("");
-  const [count, setCount] = useState(1);
-  const [shows, setShows] = useState<any[]>([]);
+type EventItem = {
+  id: string;
+  name: string;
+};
 
-  // 🔥 公演一覧をFirestoreから取得
+export default function AdminPage() {
+  const [newEventName, setNewEventName] = useState("");
+  const [events, setEvents] = useState<EventItem[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchEvents = async () => {
+    const snapshot = await getDocs(collection(db, "events"));
+    const list = snapshot.docs.map((d) => ({
+      id: d.id,
+      name: (d.data().name ?? "") as string,
+    }));
+    setEvents(list);
+  };
+
   useEffect(() => {
-    const fetchShows = async () => {
-      const snapshot = await getDocs(collection(db, "shows"));
-      const list = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setShows(list);
-    };
-
-    fetchShows();
+    fetchEvents();
   }, []);
 
-  const handleSubmit = async (e: any) => {
+  const addEvent = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!newEventName.trim()) return alert("公演名を入力してください");
 
-    await addDoc(collection(db, "reservations"), {
-      name,
-      show,
-      count,
-      createdAt: new Date(),
-    });
+    setLoading(true);
+    try {
+      await addDoc(collection(db, "events"), {
+        name: newEventName.trim(),
+      });
+      setNewEventName("");
+      await fetchEvents();
+      alert("公演を追加しました！");
+    } catch (err: any) {
+      alert("追加エラー: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    alert("予約完了しました！");
-    setName("");
-    setShow("");
-    setCount(1);
+  const removeEvent = async (id: string) => {
+    if (!confirm("この公演を削除しますか？")) return;
+
+    try {
+      await deleteDoc(doc(db, "events", id));
+      await fetchEvents();
+    } catch (err: any) {
+      alert("削除エラー: " + err.message);
+    }
   };
 
   return (
-    <main style={{ padding: 20 }}>
-      <h1>予約フォーム</h1>
+    <main style={{ maxWidth: 520, margin: "40px auto", padding: 16 }}>
+      <h1>管理画面（公演管理）</h1>
 
-      <form onSubmit={handleSubmit}>
-        <div>
-          <input
-            placeholder="お名前"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-          />
-        </div>
+      <form onSubmit={addEvent} style={{ marginTop: 16, marginBottom: 24 }}>
+        <p>公演名</p>
+        <input
+          value={newEventName}
+          onChange={(e) => setNewEventName(e.target.value)}
+          style={{ width: "100%", padding: 10, marginBottom: 10 }}
+          placeholder="例：大阪ライブ 2026/03/20"
+        />
 
-        <div>
-          <select
-            value={show}
-            onChange={(e) => setShow(e.target.value)}
-            required
-          >
-            <option value="">公演を選択</option>
-
-            {shows.map((s) => (
-              <option key={s.id} value={s.name}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <input
-            type="number"
-            value={count}
-            onChange={(e) => setCount(Number(e.target.value))}
-            min={1}
-          />
-        </div>
-
-        <button type="submit">予約する</button>
+        <button type="submit" disabled={loading} style={{ padding: 10, width: "100%" }}>
+          {loading ? "追加中..." : "公演を追加"}
+        </button>
       </form>
+
+      <h2>登録済み公演</h2>
+      {events.length === 0 ? (
+        <p style={{ opacity: 0.7 }}>まだ公演がありません</p>
+      ) : (
+        <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
+          {events.map((ev) => (
+            <div
+              key={ev.id}
+              style={{
+                border: "1px solid #ccc",
+                borderRadius: 8,
+                padding: 12,
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 12,
+              }}
+            >
+              <div>{ev.name}</div>
+              <button onClick={() => removeEvent(ev.id)} style={{ padding: "6px 10px" }}>
+                削除
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </main>
   );
 }
