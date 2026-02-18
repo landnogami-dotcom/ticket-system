@@ -1,13 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { db } from "@/lib/firebase";
 import { collection, addDoc, getDocs, deleteDoc, doc } from "firebase/firestore";
 
-type EventItem = {
-  id: string;
-  name: string;
-};
+type EventItem = { id: string; name: string };
 
 export default function AdminPage() {
   const [newEventName, setNewEventName] = useState("");
@@ -18,7 +15,7 @@ export default function AdminPage() {
     const snapshot = await getDocs(collection(db, "events"));
     const list = snapshot.docs.map((d) => ({
       id: d.id,
-      name: (d.data().name ?? "") as string,
+      name: String(d.data().name ?? ""),
     }));
     setEvents(list);
   };
@@ -27,15 +24,13 @@ export default function AdminPage() {
     fetchEvents();
   }, []);
 
-  const addEvent = async (e: React.FormEvent) => {
+  const addEvent = async (e: FormEvent) => {
     e.preventDefault();
     if (!newEventName.trim()) return alert("公演名を入力してください");
 
     setLoading(true);
     try {
-      await addDoc(collection(db, "events"), {
-        name: newEventName.trim(),
-      });
+      await addDoc(collection(db, "events"), { name: newEventName.trim() });
       setNewEventName("");
       await fetchEvents();
       alert("公演を追加しました！");
@@ -48,7 +43,6 @@ export default function AdminPage() {
 
   const removeEvent = async (id: string) => {
     if (!confirm("この公演を削除しますか？")) return;
-
     try {
       await deleteDoc(doc(db, "events", id));
       await fetchEvents();
@@ -58,7 +52,7 @@ export default function AdminPage() {
   };
 
   return (
-    <main style={{ maxWidth: 520, margin: "40px auto", padding: 16 }}>
+    <main style={{ maxWidth: 560, margin: "40px auto", padding: 16 }}>
       <h1>管理画面（公演管理）</h1>
 
       <form onSubmit={addEvent} style={{ marginTop: 16, marginBottom: 24 }}>
@@ -69,8 +63,7 @@ export default function AdminPage() {
           style={{ width: "100%", padding: 10, marginBottom: 10 }}
           placeholder="例：大阪ライブ 2026/03/20"
         />
-
-        <button type="submit" disabled={loading} style={{ padding: 10, width: "100%" }}>
+        <button type="submit" disabled={loading} style={{ width: "100%", padding: 10 }}>
           {loading ? "追加中..." : "公演を追加"}
         </button>
       </form>
