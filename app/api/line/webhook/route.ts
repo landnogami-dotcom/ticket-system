@@ -1,18 +1,16 @@
-import { NextRequest, NextResponse } from "next/server";
-import { collection, getDocs } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+// app/api/line/webhook/route.ts
+import { NextResponse } from "next/server";
 
-export async function GET(req: NextRequest) {
-  try {
-    const snapshot = await getDocs(collection(db, "reservations"));
-    const reservations = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
-    return NextResponse.json(reservations);
-  } catch (err) {
-    console.error("Failed to fetch reservations:", err);
-    return NextResponse.json({ error: "Failed to fetch reservations" }, { status: 500 });
-  }
+export async function GET() {
+  return NextResponse.json({ ok: true, message: "LINE webhook endpoint alive" });
+}
+
+export async function POST(req: Request) {
+  const body = await req.json().catch(() => null);
+
+  console.log("✅ LINE WEBHOOK HIT");
+  console.log(JSON.stringify(body, null, 2));
+
+  return NextResponse.json({ ok: true });
 }
 
