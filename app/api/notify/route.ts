@@ -1,22 +1,23 @@
 // app/api/notify/route.ts
 import { NextResponse } from "next/server";
 
-type NotifyBody = {
-  text: string;
-};
-
 export async function POST(req: Request) {
   try {
-    const { text } = (await req.json()) as NotifyBody;
+    const { text } = await req.json();
 
     const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
-    const to = process.env.LINE_USER_ID;
+    const to = process.env.LINE_NOTIFY_USER_ID; // あなたのuserIdを入れる
 
-    if (!token || !to) {
-      return NextResponse.json(
-        { error: "Missing LINE env vars (LINE_CHANNEL_ACCESS_TOKEN / LINE_USER_ID)" },
-        { status: 500 }
-      );
+    if (!token) {
+      console.error("LINE_CHANNEL_ACCESS_TOKEN is missing");
+      return NextResponse.json({ error: "token missing" }, { status: 500 });
+    }
+    if (!to) {
+      console.error("LINE_NOTIFY_USER_ID is missing");
+      return NextResponse.json({ error: "userId missing" }, { status: 500 });
+    }
+    if (!text) {
+      return NextResponse.json({ error: "text missing" }, { status: 400 });
     }
 
     const res = await fetch("https://api.line.me/v2/bot/message/push", {
@@ -27,22 +28,22 @@ export async function POST(req: Request) {
       },
       body: JSON.stringify({
         to,
-        messages: [{ type: "text", text: text ?? "通知テスト" }],
+        messages: [{ type: "text", text }],
       }),
     });
 
+    const body = await res.text();
     if (!res.ok) {
-      const detail = await res.text();
-      console.error("LINE push failed:", res.status, detail);
+      console.error("LINE push failed:", res.status, body);
       return NextResponse.json(
-        { error: "LINE push failed", status: res.status, detail },
+        { error: "LINE push failed", status: res.status, body },
         { status: 500 }
       );
     }
 
     return NextResponse.json({ ok: true });
   } catch (e: any) {
-    console.error(e);
-    return NextResponse.json({ error: e?.message ?? "Unknown error" }, { status: 500 });
+    console.error("notify error:", e);
+    return NextResponse.json({ error: e?.message ?? "unknown" }, { status: 500 });
   }
 }
