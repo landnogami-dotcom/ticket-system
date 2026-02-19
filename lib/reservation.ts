@@ -20,6 +20,14 @@ export async function addReservation(data: {
     ...data,
     createdAt: Timestamp.now(),
   });
+
+  await fetch("/api/notify", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      text: `✅ 予約が入りました\n名前: ${data.name}\n公演: ${data.event}\n枚数: ${data.quantity}`,
+    }),
+  });
 }
 
 // 予約取得（一覧表示用）
