@@ -87,7 +87,7 @@ export default function Home() {
             }}
           >
             ありがとうございます。<br />
-            当日は受付にて <strong>{name}</strong> とお伝えください。
+            当日は受付にてご予約のお名前をお伝えください。お待ちしております！
           </p>
 
           <div
