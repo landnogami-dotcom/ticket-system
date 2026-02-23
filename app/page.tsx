@@ -76,7 +76,16 @@ export default function Home() {
             ✅
           </div>
 
-          <h1 style={{ margin: 0, fontSize: 22 }}>ご予約を受け付けました</h1>
+          <h1
+  style={{
+    margin: 0,
+    fontSize: 22,
+    color: "#111",      // ← 濃い黒に近い色
+    fontWeight: "bold", // ← 太字
+  }}
+>
+  ご予約を受け付けました
+</h1>
 
           <p
             style={{
