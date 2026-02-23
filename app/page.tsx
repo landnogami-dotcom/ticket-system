@@ -141,7 +141,7 @@ export default function Home() {
               setSuccess(false); // ✅ フォームに戻る
             }}
           >
-            もう一件予約する
+            別のライブも予約する
           </button>
         </div>
       </div>
