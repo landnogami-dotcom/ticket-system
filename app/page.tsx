@@ -9,13 +9,12 @@ type EventItem = { id: string; name: string; soldOut?: boolean };
 
 export default function Home() {
   const [name, setName] = useState("");
-  const [eventId, setEventId] = useState(""); // ← 公演ID
+  const [eventId, setEventId] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [events, setEvents] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
-  // 🔥 公演取得（soldOutも読む）
   useEffect(() => {
     const fetchEvents = async () => {
       const snap = await getDocs(collection(db, "events"));
@@ -41,9 +40,8 @@ export default function Home() {
 
     setLoading(true);
     try {
-      // 予約データには「公演名」を保存（見やすい）
       await addReservation({ name, event: selectedEvent.name, quantity });
-      setSuccess(true); // ✅ ここで完了画面へ
+      setSuccess(true);
     } catch (e: any) {
       alert("エラー: " + e.message);
     } finally {
@@ -51,7 +49,7 @@ export default function Home() {
     }
   };
 
-  // ✅ 予約完了画面（おしゃれ版）
+  // ✅ 完了画面（そのまま）
   if (success) {
     return (
       <div
@@ -89,25 +87,11 @@ export default function Home() {
             ✅
           </div>
 
-          <h1
-            style={{
-              margin: 0,
-              fontSize: 22,
-              color: "#111",
-              fontWeight: "bold",
-            }}
-          >
+          <h1 style={{ margin: 0, fontSize: 22, color: "#111", fontWeight: 800 }}>
             ご予約を受け付けました
           </h1>
 
-          <p
-            style={{
-              marginTop: 12,
-              marginBottom: 0,
-              color: "#374151",
-              lineHeight: 1.7,
-            }}
-          >
+          <p style={{ marginTop: 12, marginBottom: 0, color: "#374151", lineHeight: 1.7 }}>
             ありがとうございます。<br />
             当日は受付にてご予約のお名前をお伝えください。お待ちしております！
           </p>
@@ -124,9 +108,7 @@ export default function Home() {
           >
             <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
               <span style={{ color: "#6b7280" }}>公演</span>
-              <span style={{ fontWeight: 600, color: "#111827" }}>
-                {selectedEvent?.name ?? ""}
-              </span>
+              <span style={{ fontWeight: 700, color: "#111827" }}>{selectedEvent?.name ?? ""}</span>
             </div>
 
             <div
@@ -138,7 +120,7 @@ export default function Home() {
               }}
             >
               <span style={{ color: "#6b7280" }}>枚数</span>
-              <span style={{ fontWeight: 600, color: "#111827" }}>{quantity} 枚</span>
+              <span style={{ fontWeight: 700, color: "#111827" }}>{quantity} 枚</span>
             </div>
 
             <div style={{ marginTop: 12, fontSize: 12, color: "#6b7280" }}>
@@ -155,14 +137,14 @@ export default function Home() {
               border: "none",
               background: "#111827",
               color: "white",
-              fontWeight: 700,
+              fontWeight: 800,
               cursor: "pointer",
             }}
             onClick={() => {
               setName("");
               setEventId("");
               setQuantity(1);
-              setSuccess(false); // ✅ フォームに戻る
+              setSuccess(false);
             }}
           >
             別のライブも予約する
@@ -172,65 +154,138 @@ export default function Home() {
     );
   }
 
-  // ✅ 予約フォーム
+  // ✅ フォーム（おしゃれ＆スマホ見やすい）
+  const labelStyle: React.CSSProperties = {
+    fontSize: 13,
+    color: "#374151",
+    fontWeight: 700,
+    marginBottom: 6,
+  };
+
+  const inputStyle: React.CSSProperties = {
+    width: "100%",
+    padding: "12px 12px",
+    borderRadius: 12,
+    border: "1px solid #d1d5db",
+    background: "#f9fafb",
+    outline: "none",
+    fontSize: 16, // ← iPhoneの勝手ズーム防止にも効く
+  };
+
+  const helpStyle: React.CSSProperties = {
+    marginTop: 6,
+    fontSize: 12,
+    color: "#6b7280",
+  };
+
   return (
-    <div style={{ maxWidth: 400, margin: "40px auto", fontFamily: "sans-serif" }}>
-      <h1>予約フォーム</h1>
-
-      <p>名前</p>
-      <input
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        style={{ width: "100%", marginBottom: 10, padding: 8 }}
-      />
-
-      <p>公演</p>
-      <select
-        value={eventId}
-        onChange={(e) => setEventId(e.target.value)}
-        style={{ width: "100%", marginBottom: 10, padding: 8 }}
-      >
-        <option value="">選択してください</option>
-
-        {events.map((ev) => (
-          <option key={ev.id} value={ev.id} disabled={Boolean(ev.soldOut)}>
-            {ev.name}
-            {ev.soldOut ? "（SOLD OUT）" : ""}
-          </option>
-        ))}
-      </select>
-
-      {selectedEvent?.soldOut && (
-        <div style={{ marginTop: -4, marginBottom: 10, color: "#b00020", fontSize: 13 }}>
-          この公演はソールドアウトです
-        </div>
-      )}
-
-      <p>枚数</p>
-      <input
-        type="number"
-        value={quantity}
-        onChange={(e) => setQuantity(Number(e.target.value))}
-        style={{ width: "100%", marginBottom: 10, padding: 8 }}
-        min={1}
-      />
-
-      <button
-        type="button"
-        onClick={handleSubmit}
-        disabled={loading || Boolean(selectedEvent?.soldOut)}
+    <div
+      style={{
+        maxWidth: 440,
+        margin: "30px auto",
+        padding: 16,
+        fontFamily:
+          'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial',
+      }}
+    >
+      <div
         style={{
-          width: "100%",
-          padding: 12,
-          background: loading || Boolean(selectedEvent?.soldOut) ? "#9ca3af" : "#3182ce",
-          color: "white",
-          border: "none",
-          borderRadius: 6,
-          cursor: loading || Boolean(selectedEvent?.soldOut) ? "not-allowed" : "pointer",
+          background: "white",
+          border: "1px solid #e5e7eb",
+          borderRadius: 16,
+          padding: 18,
+          boxShadow: "0 10px 30px rgba(0,0,0,0.06)",
         }}
       >
-        {loading ? "送信中..." : "予約する"}
-      </button>
+        <div style={{ marginBottom: 14 }}>
+          <h1 style={{ margin: 0, fontSize: 20, fontWeight: 900, color: "#111827" }}>
+            チケット取り置き
+          </h1>
+          <div style={{ marginTop: 6, fontSize: 13, color: "#6b7280" }}>
+            必要事項を入力して送信してください
+          </div>
+        </div>
+
+        {/* 名前 */}
+        <div style={{ marginTop: 14 }}>
+          <div style={labelStyle}>お名前</div>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="例：野上 陽平"
+            style={inputStyle}
+          />
+          <div style={helpStyle}>※ フルネームがおすすめ</div>
+        </div>
+
+        {/* 公演 */}
+        <div style={{ marginTop: 14 }}>
+          <div style={labelStyle}>公演</div>
+          <select
+            value={eventId}
+            onChange={(e) => setEventId(e.target.value)}
+            style={inputStyle}
+          >
+            <option value="">選択してください</option>
+            {events.map((ev) => (
+              <option key={ev.id} value={ev.id} disabled={Boolean(ev.soldOut)}>
+                {ev.name}
+                {ev.soldOut ? "（SOLD OUT）" : ""}
+              </option>
+            ))}
+          </select>
+
+          {selectedEvent?.soldOut ? (
+            <div style={{ ...helpStyle, color: "#b00020", fontWeight: 700 }}>
+              この公演はソールドアウトです
+            </div>
+          ) : (
+            <div style={helpStyle}>※ SOLD OUT の公演は選択できません</div>
+          )}
+        </div>
+
+        {/* 枚数 */}
+        <div style={{ marginTop: 14 }}>
+          <div style={labelStyle}>枚数</div>
+          <input
+            type="number"
+            value={quantity}
+            onChange={(e) => setQuantity(Number(e.target.value))}
+            style={inputStyle}
+            min={1}
+          />
+          <div style={helpStyle}>※ 1〜で入力</div>
+        </div>
+
+        {/* 送信 */}
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={loading || Boolean(selectedEvent?.soldOut)}
+          style={{
+            width: "100%",
+            marginTop: 18,
+            padding: "14px 14px",
+            borderRadius: 12,
+            border: "none",
+            background: loading || Boolean(selectedEvent?.soldOut) ? "#9ca3af" : "#2563eb",
+            color: "white",
+            fontWeight: 900,
+            fontSize: 16,
+            cursor: loading || Boolean(selectedEvent?.soldOut) ? "not-allowed" : "pointer",
+          }}
+        >
+          {loading ? "送信中..." : "予約する"}
+        </button>
+
+        <div style={{ marginTop: 12, fontSize: 12, color: "#6b7280", lineHeight: 1.6 }}>
+          送信後、完了画面が表示されます。<br />
+          当日は受付にてお名前をお伝えください。
+        </div>
+      </div>
+
+      {/* フォーカス時に枠をくっきりさせる小技（CSSを使わずinlineで） */}
+      <div style={{ display: "none" }} />
     </div>
   );
 }
