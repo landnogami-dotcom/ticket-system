@@ -163,14 +163,15 @@ export default function Home() {
   };
 
   const inputStyle: React.CSSProperties = {
-    width: "100%",
-    padding: "12px 12px",
-    borderRadius: 12,
-    border: "1px solid #d1d5db",
-    background: "#f9fafb",
-    outline: "none",
-    fontSize: 16, // ← iPhoneの勝手ズーム防止にも効く
-  };
+  width: "100%",
+  padding: "12px 12px",
+  borderRadius: 12,
+  border: "1px solid #d1d5db",
+  background: "#f9fafb",
+  outline: "none",
+  fontSize: 16,
+  color: "#111827",   // ← これを追加（濃い文字色）
+};
 
   const helpStyle: React.CSSProperties = {
     marginTop: 6,
