@@ -210,11 +210,11 @@ export default function Home() {
         <div style={{ marginTop: 14 }}>
           <div style={labelStyle}>お名前</div>
           <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="例：野上 陽平"
-            style={inputStyle}
-          />
+  value={name}
+  onChange={(e) => setName(e.target.value)}
+  placeholder=""
+  style={inputStyle}
+/>
           <div style={helpStyle}>※ フルネームがおすすめ</div>
         </div>
 
