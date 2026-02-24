@@ -10,9 +10,10 @@ import {
   doc,
   orderBy,
   query,
+  updateDoc,
 } from "firebase/firestore";
 
-type EventItem = { id: string; name: string };
+type EventItem = { id: string; name: string; soldOut?: boolean };
 
 type ReservationItem = {
   id: string;
@@ -35,10 +36,14 @@ export default function AdminPage() {
   // ---- 公演一覧取得
   const fetchEvents = async () => {
     const snap = await getDocs(collection(db, "events"));
-    const list = snap.docs.map((d) => ({
-      id: d.id,
-      name: String(d.data().name ?? ""),
-    }));
+    const list = snap.docs.map((d) => {
+      const data: any = d.data();
+      return {
+        id: d.id,
+        name: String(data.name ?? ""),
+        soldOut: Boolean(data.soldOut ?? false),
+      };
+    });
     setEvents(list);
   };
 
@@ -69,14 +74,17 @@ export default function AdminPage() {
     fetchReservations();
   }, []);
 
-  // ---- 公演追加
+  // ---- 公演追加（soldOutは必ずfalseで作る）
   const addEvent = async (e: FormEvent) => {
     e.preventDefault();
     if (!newEventName.trim()) return alert("公演名を入力してください");
 
     setEventLoading(true);
     try {
-      await addDoc(collection(db, "events"), { name: newEventName.trim() });
+      await addDoc(collection(db, "events"), {
+        name: newEventName.trim(),
+        soldOut: false,
+      });
       setNewEventName("");
       await fetchEvents();
       alert("公演を追加しました！");
@@ -84,6 +92,16 @@ export default function AdminPage() {
       alert("追加エラー: " + err.message);
     } finally {
       setEventLoading(false);
+    }
+  };
+
+  // ---- SOLD OUT切替
+  const toggleSoldOut = async (id: string, current: boolean) => {
+    try {
+      await updateDoc(doc(db, "events", id), { soldOut: !current });
+      await fetchEvents();
+    } catch (err: any) {
+      alert("更新エラー: " + err.message);
     }
   };
 
@@ -149,10 +167,59 @@ export default function AdminPage() {
                   gap: 12,
                 }}
               >
-                <div>{ev.name}</div>
-                <button onClick={() => removeEvent(ev.id)} style={{ padding: "6px 10px" }}>
-                  削除
-                </button>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, wordBreak: "break-word" }}>{ev.name}</div>
+                  <div style={{ marginTop: 6 }}>
+                    {ev.soldOut ? (
+                      <span
+                        style={{
+                          display: "inline-block",
+                          padding: "3px 8px",
+                          borderRadius: 999,
+                          background: "#ffe5e5",
+                          color: "#b00020",
+                          fontSize: 12,
+                          border: "1px solid #ffb3b3",
+                        }}
+                      >
+                        SOLD OUT
+                      </span>
+                    ) : (
+                      <span
+                        style={{
+                          display: "inline-block",
+                          padding: "3px 8px",
+                          borderRadius: 999,
+                          background: "#e7fff1",
+                          color: "#0a7a3d",
+                          fontSize: 12,
+                          border: "1px solid #b7f3cf",
+                        }}
+                      >
+                        販売中
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                  <button
+                    onClick={() => toggleSoldOut(ev.id, Boolean(ev.soldOut))}
+                    style={{
+                      padding: "6px 10px",
+                      borderRadius: 8,
+                      border: "1px solid #ddd",
+                      background: ev.soldOut ? "#fff" : "#111",
+                      color: ev.soldOut ? "#111" : "#fff",
+                    }}
+                  >
+                    {ev.soldOut ? "販売中に戻す" : "SOLD OUTにする"}
+                  </button>
+
+                  <button onClick={() => removeEvent(ev.id)} style={{ padding: "6px 10px" }}>
+                    削除
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -209,4 +276,3 @@ export default function AdminPage() {
     </main>
   );
 }
-
