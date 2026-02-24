@@ -5,31 +5,44 @@ import { addReservation } from "@/lib/reservation";
 import { db } from "@/lib/firebase";
 import { collection, getDocs } from "firebase/firestore";
 
+type EventItem = { id: string; name: string; soldOut?: boolean };
+
 export default function Home() {
   const [name, setName] = useState("");
-  const [event, setEvent] = useState("");
+  const [eventId, setEventId] = useState(""); // ← 公演ID
   const [quantity, setQuantity] = useState(1);
-  const [events, setEvents] = useState<string[]>([]);
+  const [events, setEvents] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
-  // 🔥 公演取得
+  // 🔥 公演取得（soldOutも読む）
   useEffect(() => {
     const fetchEvents = async () => {
       const snap = await getDocs(collection(db, "events"));
-      const list = snap.docs.map((doc) => String(doc.data().name));
+      const list: EventItem[] = snap.docs.map((d) => {
+        const data: any = d.data();
+        return {
+          id: d.id,
+          name: String(data.name ?? ""),
+          soldOut: Boolean(data.soldOut ?? false),
+        };
+      });
       setEvents(list);
     };
     fetchEvents();
   }, []);
 
+  const selectedEvent = events.find((e) => e.id === eventId);
+
   const handleSubmit = async () => {
     if (!name) return alert("名前を入力してください");
-    if (!event) return alert("公演を選択してください");
+    if (!selectedEvent) return alert("公演を選択してください");
+    if (selectedEvent.soldOut) return alert("申し訳ありません。この公演はソールドアウトです。");
 
     setLoading(true);
     try {
-      await addReservation({ name, event, quantity });
+      // 予約データには「公演名」を保存（見やすい）
+      await addReservation({ name, event: selectedEvent.name, quantity });
       setSuccess(true); // ✅ ここで完了画面へ
     } catch (e: any) {
       alert("エラー: " + e.message);
@@ -77,15 +90,15 @@ export default function Home() {
           </div>
 
           <h1
-  style={{
-    margin: 0,
-    fontSize: 22,
-    color: "#111",      // ← 濃い黒に近い色
-    fontWeight: "bold", // ← 太字
-  }}
->
-  ご予約を受け付けました
-</h1>
+            style={{
+              margin: 0,
+              fontSize: 22,
+              color: "#111",
+              fontWeight: "bold",
+            }}
+          >
+            ご予約を受け付けました
+          </h1>
 
           <p
             style={{
@@ -111,7 +124,9 @@ export default function Home() {
           >
             <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
               <span style={{ color: "#6b7280" }}>公演</span>
-              <span style={{ fontWeight: 600, color: "#111827" }}>{event}</span>
+              <span style={{ fontWeight: 600, color: "#111827" }}>
+                {selectedEvent?.name ?? ""}
+              </span>
             </div>
 
             <div
@@ -145,7 +160,7 @@ export default function Home() {
             }}
             onClick={() => {
               setName("");
-              setEvent("");
+              setEventId("");
               setQuantity(1);
               setSuccess(false); // ✅ フォームに戻る
             }}
@@ -171,17 +186,25 @@ export default function Home() {
 
       <p>公演</p>
       <select
-        value={event}
-        onChange={(e) => setEvent(e.target.value)}
+        value={eventId}
+        onChange={(e) => setEventId(e.target.value)}
         style={{ width: "100%", marginBottom: 10, padding: 8 }}
       >
         <option value="">選択してください</option>
-        {events.map((ev, i) => (
-          <option key={i} value={ev}>
-            {ev}
+
+        {events.map((ev) => (
+          <option key={ev.id} value={ev.id} disabled={Boolean(ev.soldOut)}>
+            {ev.name}
+            {ev.soldOut ? "（SOLD OUT）" : ""}
           </option>
         ))}
       </select>
+
+      {selectedEvent?.soldOut && (
+        <div style={{ marginTop: -4, marginBottom: 10, color: "#b00020", fontSize: 13 }}>
+          この公演はソールドアウトです
+        </div>
+      )}
 
       <p>枚数</p>
       <input
@@ -195,15 +218,15 @@ export default function Home() {
       <button
         type="button"
         onClick={handleSubmit}
-        disabled={loading}
+        disabled={loading || Boolean(selectedEvent?.soldOut)}
         style={{
           width: "100%",
           padding: 12,
-          background: "#3182ce",
+          background: loading || Boolean(selectedEvent?.soldOut) ? "#9ca3af" : "#3182ce",
           color: "white",
           border: "none",
           borderRadius: 6,
-          cursor: "pointer",
+          cursor: loading || Boolean(selectedEvent?.soldOut) ? "not-allowed" : "pointer",
         }}
       >
         {loading ? "送信中..." : "予約する"}
