@@ -13,7 +13,12 @@ import {
   updateDoc,
 } from "firebase/firestore";
 
-type EventItem = { id: string; name: string; soldOut?: boolean; order?: number };
+type EventItem = {
+  id: string;
+  name: string;
+  soldOut?: boolean;
+  order?: number;
+};
 
 type ReservationItem = {
   id: string;
@@ -24,12 +29,10 @@ type ReservationItem = {
 };
 
 export default function AdminPage() {
-  // 公演
   const [newEventName, setNewEventName] = useState("");
   const [events, setEvents] = useState<EventItem[]>([]);
   const [eventLoading, setEventLoading] = useState(false);
 
-  // 予約
   const [reservations, setReservations] = useState<ReservationItem[]>([]);
   const [resLoading, setResLoading] = useState(false);
 
@@ -37,6 +40,7 @@ export default function AdminPage() {
   const fetchEvents = async () => {
     const q = query(collection(db, "events"), orderBy("order", "asc"));
     const snap = await getDocs(q);
+
     const list = snap.docs.map((d) => {
       const data: any = d.data();
       return {
@@ -46,6 +50,7 @@ export default function AdminPage() {
         order: Number(data.order ?? 0),
       };
     });
+
     setEvents(list);
   };
 
@@ -55,6 +60,7 @@ export default function AdminPage() {
     try {
       const q = query(collection(db, "reservations"), orderBy("createdAt", "desc"));
       const snap = await getDocs(q);
+
       const list = snap.docs.map((d) => {
         const data: any = d.data();
         return {
@@ -65,6 +71,7 @@ export default function AdminPage() {
           createdAt: data.createdAt,
         };
       });
+
       setReservations(list);
     } finally {
       setResLoading(false);
@@ -76,7 +83,7 @@ export default function AdminPage() {
     fetchReservations();
   }, []);
 
-  // ---- 公演追加（末尾に追加されるように order を最大+1）
+  // ---- 公演追加
   const addEvent = async (e: FormEvent) => {
     e.preventDefault();
     if (!newEventName.trim()) return alert("公演名を入力してください");
@@ -84,11 +91,13 @@ export default function AdminPage() {
     setEventLoading(true);
     try {
       const maxOrder = events.reduce((m, ev) => Math.max(m, ev.order ?? 0), 0);
+
       await addDoc(collection(db, "events"), {
         name: newEventName.trim(),
         soldOut: false,
         order: maxOrder + 1,
       });
+
       setNewEventName("");
       await fetchEvents();
       alert("公演を追加しました！");
@@ -109,13 +118,15 @@ export default function AdminPage() {
     }
   };
 
-  // ---- 並び順入れ替え（↑↓）
+  // ---- 並び替え
   const swapOrder = async (a: EventItem, b: EventItem) => {
     try {
       const aOrder = Number(a.order ?? 0);
       const bOrder = Number(b.order ?? 0);
+
       await updateDoc(doc(db, "events", a.id), { order: bOrder });
       await updateDoc(doc(db, "events", b.id), { order: aOrder });
+
       await fetchEvents();
     } catch (err: any) {
       alert("並び替えエラー: " + err.message);
@@ -132,7 +143,6 @@ export default function AdminPage() {
     await swapOrder(events[index], events[index + 1]);
   };
 
-  // ---- 公演削除
   const removeEvent = async (id: string) => {
     if (!confirm("この公演を削除しますか？")) return;
     try {
@@ -143,7 +153,6 @@ export default function AdminPage() {
     }
   };
 
-  // ---- 予約削除
   const removeReservation = async (id: string) => {
     if (!confirm("この予約を削除しますか？")) return;
     try {
@@ -157,20 +166,19 @@ export default function AdminPage() {
   const totalTickets = reservations.reduce((sum, r) => sum + (r.quantity || 0), 0);
 
   return (
-    <main style={{ maxWidth: 720, margin: "40px auto", padding: 16 }}>
+    <main style={{ maxWidth: 760, margin: "40px auto", padding: 16 }}>
       <h1>管理画面</h1>
 
       {/* 公演管理 */}
-      <section style={{ marginTop: 24, padding: 16, border: "1px solid #ccc", borderRadius: 10 }}>
+      <section style={{ marginTop: 24, padding: 16, border: "1px solid #ddd", borderRadius: 12 }}>
         <h2>公演管理</h2>
 
         <form onSubmit={addEvent} style={{ marginTop: 12, marginBottom: 16 }}>
-          <p>公演名</p>
           <input
             value={newEventName}
             onChange={(e) => setNewEventName(e.target.value)}
             style={{ width: "100%", padding: 10, marginBottom: 10 }}
-            placeholder="例：大阪ライブ 2026/03/20"
+            placeholder="公演名を入力"
           />
           <button type="submit" disabled={eventLoading} style={{ width: "100%", padding: 10 }}>
             {eventLoading ? "追加中..." : "公演を追加"}
@@ -185,22 +193,41 @@ export default function AdminPage() {
               <div
                 key={ev.id}
                 style={{
-                  border: "1px solid #ddd",
-                  borderRadius: 8,
-                  padding: 12,
+                  border: "1px solid #e5e7eb",
+                  borderRadius: 12,
+                  padding: 14,
                   display: "flex",
                   justifyContent: "space-between",
-                  alignItems: "center",
-                  gap: 12,
+                  alignItems: "flex-start",
+                  gap: 14,
                 }}
               >
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontWeight: 600, wordBreak: "break-word" }}>{ev.name}</div>
+                {/* 🔥 2行まで表示（縦長防止） */}
+                <div
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                  }}
+                >
+                  <div
+                    style={{
+                      fontWeight: 700,
+                      lineHeight: 1.4,
+                      overflow: "hidden",
+                      display: "-webkit-box",
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: "vertical",
+                      wordBreak: "break-word",
+                    }}
+                    title={ev.name}
+                  >
+                    {ev.name}
+                  </div>
+
                   <div style={{ marginTop: 6 }}>
                     {ev.soldOut ? (
                       <span
                         style={{
-                          display: "inline-block",
                           padding: "3px 8px",
                           borderRadius: 999,
                           background: "#ffe5e5",
@@ -214,7 +241,6 @@ export default function AdminPage() {
                     ) : (
                       <span
                         style={{
-                          display: "inline-block",
                           padding: "3px 8px",
                           borderRadius: 999,
                           background: "#e7fff1",
@@ -226,44 +252,28 @@ export default function AdminPage() {
                         販売中
                       </span>
                     )}
-                    <span style={{ marginLeft: 10, fontSize: 12, color: "#6b7280" }}>
-                      order: {ev.order ?? 0}
-                    </span>
                   </div>
                 </div>
 
-                <div style={{ display: "flex", gap: 8, flexShrink: 0, flexWrap: "wrap" }}>
-                  <button
-                    onClick={() => moveUp(idx)}
-                    disabled={idx === 0}
-                    style={{ padding: "6px 10px" }}
-                  >
+                {/* ボタン群 */}
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 6,
+                    flexShrink: 0,
+                  }}
+                >
+                  <button onClick={() => moveUp(idx)} disabled={idx === 0}>
                     ↑
                   </button>
-                  <button
-                    onClick={() => moveDown(idx)}
-                    disabled={idx === events.length - 1}
-                    style={{ padding: "6px 10px" }}
-                  >
+                  <button onClick={() => moveDown(idx)} disabled={idx === events.length - 1}>
                     ↓
                   </button>
-
-                  <button
-                    onClick={() => toggleSoldOut(ev.id, Boolean(ev.soldOut))}
-                    style={{
-                      padding: "6px 10px",
-                      borderRadius: 8,
-                      border: "1px solid #ddd",
-                      background: ev.soldOut ? "#fff" : "#111",
-                      color: ev.soldOut ? "#111" : "#fff",
-                    }}
-                  >
-                    {ev.soldOut ? "販売中に戻す" : "SOLD OUTにする"}
+                  <button onClick={() => toggleSoldOut(ev.id, Boolean(ev.soldOut))}>
+                    {ev.soldOut ? "販売中に戻す" : "SOLD OUT"}
                   </button>
-
-                  <button onClick={() => removeEvent(ev.id)} style={{ padding: "6px 10px" }}>
-                    削除
-                  </button>
+                  <button onClick={() => removeEvent(ev.id)}>削除</button>
                 </div>
               </div>
             ))}
@@ -272,47 +282,33 @@ export default function AdminPage() {
       </section>
 
       {/* 予約一覧 */}
-      <section style={{ marginTop: 24, padding: 16, border: "1px solid #ccc", borderRadius: 10 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-          <h2>予約一覧</h2>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={fetchReservations} style={{ padding: "6px 10px" }}>
-              更新
-            </button>
-            <div style={{ padding: "6px 10px", border: "1px solid #ddd", borderRadius: 8 }}>
-              合計枚数：{totalTickets}
-            </div>
-          </div>
-        </div>
+      <section style={{ marginTop: 24, padding: 16, border: "1px solid #ddd", borderRadius: 12 }}>
+        <h2>予約一覧</h2>
+
+        <div style={{ marginBottom: 10 }}>合計枚数：{totalTickets}</div>
 
         {resLoading ? (
           <p>読み込み中...</p>
         ) : reservations.length === 0 ? (
           <p style={{ opacity: 0.7 }}>予約がありません</p>
         ) : (
-          <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
+          <div style={{ display: "grid", gap: 10 }}>
             {reservations.map((r) => (
               <div
                 key={r.id}
                 style={{
-                  border: "1px solid #ddd",
-                  borderRadius: 8,
+                  border: "1px solid #e5e7eb",
+                  borderRadius: 12,
                   padding: 12,
                   display: "flex",
                   justifyContent: "space-between",
-                  alignItems: "center",
-                  gap: 12,
                 }}
               >
                 <div>
-                  <div>
-                    <strong>{r.name}</strong> ／ {r.quantity}枚
-                  </div>
-                  <div style={{ opacity: 0.8, fontSize: 14 }}>{r.event}</div>
+                  <strong>{r.name}</strong> ／ {r.quantity}枚
+                  <div style={{ fontSize: 14, opacity: 0.8 }}>{r.event}</div>
                 </div>
-                <button onClick={() => removeReservation(r.id)} style={{ padding: "6px 10px" }}>
-                  削除
-                </button>
+                <button onClick={() => removeReservation(r.id)}>削除</button>
               </div>
             ))}
           </div>
