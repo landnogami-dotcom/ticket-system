@@ -23,18 +23,52 @@ type EventItem = {
 type ReservationItem = {
   id: string;
   name: string;
-  event: string; // ← 公演名が入ってる想定
+  event: string; // 公演名
   quantity: number;
   createdAt?: any;
 };
 
 export default function AdminPage() {
-  // 公演
+  // ===== ボタン見た目 =====
+  const btnBase: React.CSSProperties = {
+    padding: "8px 10px",
+    borderRadius: 10,
+    border: "1px solid #d1d5db",
+    background: "#fff",
+    fontWeight: 800,
+    cursor: "pointer",
+    whiteSpace: "nowrap",
+  };
+
+  const btnGhost: React.CSSProperties = {
+    ...btnBase,
+    background: "#f9fafb",
+  };
+
+  const btnPrimary: React.CSSProperties = {
+    ...btnBase,
+    border: "1px solid #bfdbfe",
+    background: "#eff6ff",
+    color: "#1d4ed8",
+  };
+
+  const btnDanger: React.CSSProperties = {
+    ...btnBase,
+    border: "1px solid #fecaca",
+    background: "#fff1f2",
+    color: "#b91c1c",
+  };
+
+  const btnDisabled: React.CSSProperties = {
+    opacity: 0.5,
+    cursor: "not-allowed",
+  };
+
+  // ===== state =====
   const [newEventName, setNewEventName] = useState("");
   const [events, setEvents] = useState<EventItem[]>([]);
   const [eventLoading, setEventLoading] = useState(false);
 
-  // 予約
   const [reservations, setReservations] = useState<ReservationItem[]>([]);
   const [resLoading, setResLoading] = useState(false);
 
@@ -176,7 +210,7 @@ export default function AdminPage() {
   );
 
   return (
-    <main style={{ maxWidth: 820, margin: "40px auto", padding: 16 }}>
+    <main style={{ maxWidth: 860, margin: "40px auto", padding: 16 }}>
       <h1>管理画面</h1>
 
       {/* 公演管理 */}
@@ -187,10 +221,30 @@ export default function AdminPage() {
           <input
             value={newEventName}
             onChange={(e) => setNewEventName(e.target.value)}
-            style={{ width: "100%", padding: 10, marginBottom: 10 }}
+            style={{
+              width: "100%",
+              padding: 12,
+              marginBottom: 10,
+              borderRadius: 10,
+              border: "1px solid #d1d5db",
+            }}
             placeholder="公演名を入力"
           />
-          <button type="submit" disabled={eventLoading} style={{ width: "100%", padding: 10 }}>
+          <button
+            type="submit"
+            disabled={eventLoading}
+            style={{
+              width: "100%",
+              padding: 12,
+              borderRadius: 10,
+              border: "1px solid #bfdbfe",
+              background: "#2563eb",
+              color: "white",
+              fontWeight: 900,
+              cursor: eventLoading ? "not-allowed" : "pointer",
+              opacity: eventLoading ? 0.7 : 1,
+            }}
+          >
             {eventLoading ? "追加中..." : "公演を追加"}
           </button>
         </form>
@@ -210,13 +264,14 @@ export default function AdminPage() {
                   justifyContent: "space-between",
                   alignItems: "flex-start",
                   gap: 14,
+                  background: "#fff",
                 }}
               >
                 {/* 2行まで表示 */}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div
                     style={{
-                      fontWeight: 700,
+                      fontWeight: 800,
                       lineHeight: 1.4,
                       overflow: "hidden",
                       display: "-webkit-box",
@@ -229,7 +284,7 @@ export default function AdminPage() {
                     {ev.name}
                   </div>
 
-                  <div style={{ marginTop: 6, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
                     {ev.soldOut ? (
                       <span
                         style={{
@@ -239,6 +294,7 @@ export default function AdminPage() {
                           color: "#b00020",
                           fontSize: 12,
                           border: "1px solid #ffb3b3",
+                          fontWeight: 800,
                         }}
                       >
                         SOLD OUT
@@ -252,13 +308,13 @@ export default function AdminPage() {
                           color: "#0a7a3d",
                           fontSize: 12,
                           border: "1px solid #b7f3cf",
+                          fontWeight: 800,
                         }}
                       >
                         販売中
                       </span>
                     )}
 
-                    {/* この公演の予約合計 */}
                     <span
                       style={{
                         padding: "3px 8px",
@@ -267,25 +323,46 @@ export default function AdminPage() {
                         color: "#374151",
                         fontSize: 12,
                         border: "1px solid #e5e7eb",
+                        fontWeight: 800,
                       }}
                     >
-                      予約合計：{reservationsByEvent.get(ev.name)?.reduce((s, r) => s + r.quantity, 0) ?? 0} 枚
+                      予約合計：
+                      {reservationsByEvent.get(ev.name)?.reduce((s, r) => s + r.quantity, 0) ?? 0} 枚
                     </span>
                   </div>
                 </div>
 
-                {/* ボタン */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
-                  <button onClick={() => moveUp(idx)} disabled={idx === 0}>
-                    ↑
+                {/* ボタン（囲い付き） */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 8, flexShrink: 0 }}>
+                  <button
+                    onClick={() => moveUp(idx)}
+                    disabled={idx === 0}
+                    style={{ ...btnGhost, ...(idx === 0 ? btnDisabled : {}) }}
+                  >
+                    ↑ 上へ
                   </button>
-                  <button onClick={() => moveDown(idx)} disabled={idx === events.length - 1}>
-                    ↓
+
+                  <button
+                    onClick={() => moveDown(idx)}
+                    disabled={idx === events.length - 1}
+                    style={{
+                      ...btnGhost,
+                      ...(idx === events.length - 1 ? btnDisabled : {}),
+                    }}
+                  >
+                    ↓ 下へ
                   </button>
-                  <button onClick={() => toggleSoldOut(ev.id, Boolean(ev.soldOut))}>
-                    {ev.soldOut ? "販売中に戻す" : "SOLD OUT"}
+
+                  <button
+                    onClick={() => toggleSoldOut(ev.id, Boolean(ev.soldOut))}
+                    style={ev.soldOut ? btnGhost : btnPrimary}
+                  >
+                    {ev.soldOut ? "販売中に戻す" : "SOLD OUTにする"}
                   </button>
-                  <button onClick={() => removeEvent(ev.id)}>削除</button>
+
+                  <button onClick={() => removeEvent(ev.id)} style={btnDanger}>
+                    削除
+                  </button>
                 </div>
               </div>
             ))}
@@ -298,11 +375,11 @@ export default function AdminPage() {
         <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
           <h2>予約一覧（公演ごと）</h2>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <button onClick={fetchReservations} style={{ padding: "6px 10px" }}>
+            <button onClick={fetchReservations} style={btnGhost}>
               更新
             </button>
-            <div style={{ padding: "6px 10px", border: "1px solid #ddd", borderRadius: 8 }}>
-              全体合計：{totalTicketsAll} 枚
+            <div style={{ padding: "8px 10px", border: "1px solid #ddd", borderRadius: 10 }}>
+              全体合計：<strong>{totalTicketsAll}</strong> 枚
             </div>
           </div>
         </div>
@@ -328,7 +405,7 @@ export default function AdminPage() {
                   }}
                 >
                   <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-                    <div style={{ fontWeight: 800 }}>{ev.name}</div>
+                    <div style={{ fontWeight: 900 }}>{ev.name}</div>
                     <div style={{ color: "#374151" }}>
                       合計 <strong>{sum}</strong> 枚 ／ {list.length} 件
                     </div>
@@ -343,19 +420,22 @@ export default function AdminPage() {
                           key={r.id}
                           style={{
                             border: "1px solid #eee",
-                            borderRadius: 10,
+                            borderRadius: 12,
                             padding: 10,
                             display: "flex",
                             justifyContent: "space-between",
                             alignItems: "center",
                             gap: 12,
+                            background: "#fafafa",
                           }}
                         >
                           <div>
                             <strong>{r.name}</strong>
-                            <span style={{ marginLeft: 8, color: "#374151" }}>／ {r.quantity}枚</span>
+                            <span style={{ marginLeft: 8, color: "#374151", fontWeight: 700 }}>
+                              ／ {r.quantity}枚
+                            </span>
                           </div>
-                          <button onClick={() => removeReservation(r.id)} style={{ padding: "6px 10px" }}>
+                          <button onClick={() => removeReservation(r.id)} style={btnDanger}>
                             削除
                           </button>
                         </div>
