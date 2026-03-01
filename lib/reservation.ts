@@ -1,45 +1,26 @@
-import { db } from "./firebase";
-import {
-  collection,
-  addDoc,
-  getDocs,
-  deleteDoc,
-  doc,
-  Timestamp,
-} from "firebase/firestore";
+// lib/reservation.ts
+import { db } from "@/lib/firebase";
+import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 
-const RESERVATIONS = "reservations";
-
-// 予約追加
-export async function addReservation(data: {
+export type AddReservationInput = {
   name: string;
-  event: string;
+  eventId: string;     // ✅ 追加：公演ID
   quantity: number;
-}) {
-  await addDoc(collection(db, RESERVATIONS), {
-    ...data,
-    createdAt: Timestamp.now(),
+};
+
+export async function addReservation(input: AddReservationInput) {
+  const name = (input.name ?? "").trim();
+  const eventId = (input.eventId ?? "").trim();
+  const quantity = Number(input.quantity ?? 0);
+
+  if (!name) throw new Error("名前が空です");
+  if (!eventId) throw new Error("公演が未選択です");
+  if (!Number.isFinite(quantity) || quantity < 1) throw new Error("枚数が不正です");
+
+  await addDoc(collection(db, "reservations"), {
+    name,
+    eventId,               // ✅ 予約は eventId で紐づけ
+    quantity,
+    createdAt: serverTimestamp(),
   });
-
-  await fetch("/api/notify", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      text: `✅ 予約が入りました\n名前: ${data.name}\n公演: ${data.event}\n枚数: ${data.quantity}`,
-    }),
-  });
-}
-
-// 予約取得（一覧表示用）
-export async function getReservations() {
-  const snapshot = await getDocs(collection(db, RESERVATIONS));
-  return snapshot.docs.map((d) => ({
-    id: d.id,
-    ...(d.data() as any),
-  }));
-}
-
-// 予約削除
-export async function deleteReservation(id: string) {
-  await deleteDoc(doc(db, RESERVATIONS, id));
 }

@@ -23,7 +23,8 @@ type EventItem = {
 type ReservationItem = {
   id: string;
   name: string;
-  event: string; // 公演名
+  eventId?: string;   // ✅ 新：公演ID
+  event?: string;     // ✅ 旧：公演名（古い予約のため残す）
   quantity: number;
   createdAt?: any;
 };
@@ -72,6 +73,11 @@ export default function AdminPage() {
   const [reservations, setReservations] = useState<ReservationItem[]>([]);
   const [resLoading, setResLoading] = useState(false);
 
+  // ---- 編集用
+  const [editingEventId, setEditingEventId] = useState<string | null>(null);
+  const [editingEventName, setEditingEventName] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
+
   // ---- 公演一覧取得（order順）
   const fetchEvents = async () => {
     const q = query(collection(db, "events"), orderBy("order", "asc"));
@@ -99,7 +105,8 @@ export default function AdminPage() {
         return {
           id: d.id,
           name: String(data.name ?? ""),
-          event: String(data.event ?? ""),
+          eventId: data.eventId ? String(data.eventId) : undefined,
+          event: data.event ? String(data.event) : undefined,
           quantity: Number(data.quantity ?? 0),
           createdAt: data.createdAt,
         };
@@ -115,7 +122,7 @@ export default function AdminPage() {
     fetchReservations();
   }, []);
 
-  // ---- 公演追加（末尾に追加）
+  // ---- 公演追加（末尾）
   const addEvent = async (e: FormEvent) => {
     e.preventDefault();
     if (!newEventName.trim()) return alert("公演名を入力してください");
@@ -171,6 +178,33 @@ export default function AdminPage() {
     await swapOrder(events[index], events[index + 1]);
   };
 
+  // ---- 公演名編集
+  const startEditEvent = (ev: EventItem) => {
+    setEditingEventId(ev.id);
+    setEditingEventName(ev.name);
+  };
+
+  const cancelEditEvent = () => {
+    setEditingEventId(null);
+    setEditingEventName("");
+  };
+
+  const saveEditEvent = async () => {
+    if (!editingEventId) return;
+    if (!editingEventName.trim()) return alert("公演名を入力してください");
+
+    setEditSaving(true);
+    try {
+      await updateDoc(doc(db, "events", editingEventId), { name: editingEventName.trim() });
+      await fetchEvents();
+      cancelEditEvent();
+    } catch (err: any) {
+      alert("更新エラー: " + err.message);
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
   // ---- 公演削除
   const removeEvent = async (id: string) => {
     if (!confirm("この公演を削除しますか？")) return;
@@ -193,15 +227,27 @@ export default function AdminPage() {
     }
   };
 
-  // ---- 公演ごとに予約をまとめる（event名でグループ化）
-  const reservationsByEvent = useMemo(() => {
+  // ✅ eventId → event 情報
+  const eventMap = useMemo(() => {
+    const m = new Map<string, EventItem>();
+    for (const ev of events) m.set(ev.id, ev);
+    return m;
+  }, [events]);
+
+  // ✅ eventIdごとに予約をまとめる（新方式）
+  const reservationsByEventId = useMemo(() => {
     const map = new Map<string, ReservationItem[]>();
     for (const r of reservations) {
-      const key = r.event || "（公演名なし）";
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(r);
+      if (!r.eventId) continue;
+      if (!map.has(r.eventId)) map.set(r.eventId, []);
+      map.get(r.eventId)!.push(r);
     }
     return map;
+  }, [reservations]);
+
+  // ✅ 古い予約（eventId無し）を拾う
+  const legacyReservations = useMemo(() => {
+    return reservations.filter((r) => !r.eventId);
   }, [reservations]);
 
   const totalTicketsAll = useMemo(
@@ -210,7 +256,7 @@ export default function AdminPage() {
   );
 
   return (
-    <main style={{ maxWidth: 860, margin: "40px auto", padding: 16 }}>
+    <main style={{ maxWidth: 900, margin: "40px auto", padding: 16 }}>
       <h1>管理画面</h1>
 
       {/* 公演管理 */}
@@ -253,124 +299,162 @@ export default function AdminPage() {
           <p style={{ opacity: 0.7 }}>まだ公演がありません</p>
         ) : (
           <div style={{ display: "grid", gap: 10 }}>
-            {events.map((ev, idx) => (
-              <div
-                key={ev.id}
-                style={{
-                  border: "1px solid #e5e7eb",
-                  borderRadius: 12,
-                  padding: 14,
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "flex-start",
-                  gap: 14,
-                  background: "#fff",
-                }}
-              >
-                {/* 2行まで表示 */}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div
-                    style={{
-                      fontWeight: 800,
-                      lineHeight: 1.4,
-                      overflow: "hidden",
-                      display: "-webkit-box",
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: "vertical",
-                      wordBreak: "break-word",
-                    }}
-                    title={ev.name}
-                  >
-                    {ev.name}
-                  </div>
+            {events.map((ev, idx) => {
+              const sum = reservationsByEventId.get(ev.id)?.reduce((s, r) => s + r.quantity, 0) ?? 0;
 
-                  <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    {ev.soldOut ? (
-                      <span
-                        style={{
-                          padding: "3px 8px",
-                          borderRadius: 999,
-                          background: "#ffe5e5",
-                          color: "#b00020",
-                          fontSize: 12,
-                          border: "1px solid #ffb3b3",
-                          fontWeight: 800,
-                        }}
-                      >
-                        SOLD OUT
-                      </span>
+              return (
+                <div
+                  key={ev.id}
+                  style={{
+                    border: "1px solid #e5e7eb",
+                    borderRadius: 12,
+                    padding: 14,
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "flex-start",
+                    gap: 14,
+                    background: "#fff",
+                  }}
+                >
+                  {/* 左側 */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    {/* 公演名（通常/編集） */}
+                    {editingEventId === ev.id ? (
+                      <div style={{ display: "grid", gap: 8 }}>
+                        <input
+                          value={editingEventName}
+                          onChange={(e) => setEditingEventName(e.target.value)}
+                          style={{
+                            width: "100%",
+                            padding: 10,
+                            borderRadius: 10,
+                            border: "1px solid #d1d5db",
+                          }}
+                        />
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          <button
+                            onClick={saveEditEvent}
+                            disabled={editSaving}
+                            style={{
+                              padding: "8px 10px",
+                              borderRadius: 10,
+                              border: "1px solid #bfdbfe",
+                              background: "#2563eb",
+                              color: "white",
+                              fontWeight: 900,
+                              cursor: editSaving ? "not-allowed" : "pointer",
+                              opacity: editSaving ? 0.7 : 1,
+                            }}
+                          >
+                            {editSaving ? "保存中..." : "保存"}
+                          </button>
+                          <button onClick={cancelEditEvent} style={btnGhost}>
+                            キャンセル
+                          </button>
+                        </div>
+                      </div>
                     ) : (
-                      <span
+                      <div
                         style={{
-                          padding: "3px 8px",
-                          borderRadius: 999,
-                          background: "#e7fff1",
-                          color: "#0a7a3d",
-                          fontSize: 12,
-                          border: "1px solid #b7f3cf",
-                          fontWeight: 800,
+                          fontWeight: 900,
+                          lineHeight: 1.4,
+                          overflow: "hidden",
+                          display: "-webkit-box",
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: "vertical",
+                          wordBreak: "break-word",
                         }}
+                        title={ev.name}
                       >
-                        販売中
-                      </span>
+                        {ev.name}
+                      </div>
                     )}
 
-                    <span
-                      style={{
-                        padding: "3px 8px",
-                        borderRadius: 999,
-                        background: "#f3f4f6",
-                        color: "#374151",
-                        fontSize: 12,
-                        border: "1px solid #e5e7eb",
-                        fontWeight: 800,
-                      }}
+                    <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      {ev.soldOut ? (
+                        <span
+                          style={{
+                            padding: "3px 8px",
+                            borderRadius: 999,
+                            background: "#ffe5e5",
+                            color: "#b00020",
+                            fontSize: 12,
+                            border: "1px solid #ffb3b3",
+                            fontWeight: 800,
+                          }}
+                        >
+                          SOLD OUT
+                        </span>
+                      ) : (
+                        <span
+                          style={{
+                            padding: "3px 8px",
+                            borderRadius: 999,
+                            background: "#e7fff1",
+                            color: "#0a7a3d",
+                            fontSize: 12,
+                            border: "1px solid #b7f3cf",
+                            fontWeight: 800,
+                          }}
+                        >
+                          販売中
+                        </span>
+                      )}
+
+                      <span
+                        style={{
+                          padding: "3px 8px",
+                          borderRadius: 999,
+                          background: "#f3f4f6",
+                          color: "#374151",
+                          fontSize: 12,
+                          border: "1px solid #e5e7eb",
+                          fontWeight: 800,
+                        }}
+                      >
+                        予約合計：{sum} 枚
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* 右側ボタン */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8, flexShrink: 0 }}>
+                    <button
+                      onClick={() => moveUp(idx)}
+                      disabled={idx === 0}
+                      style={{ ...btnGhost, ...(idx === 0 ? btnDisabled : {}) }}
                     >
-                      予約合計：
-                      {reservationsByEvent.get(ev.name)?.reduce((s, r) => s + r.quantity, 0) ?? 0} 枚
-                    </span>
+                      ↑ 上へ
+                    </button>
+
+                    <button
+                      onClick={() => moveDown(idx)}
+                      disabled={idx === events.length - 1}
+                      style={{ ...btnGhost, ...(idx === events.length - 1 ? btnDisabled : {}) }}
+                    >
+                      ↓ 下へ
+                    </button>
+
+                    <button onClick={() => startEditEvent(ev)} style={btnBase}>
+                      編集
+                    </button>
+
+                    <button onClick={() => toggleSoldOut(ev.id, Boolean(ev.soldOut))} style={ev.soldOut ? btnGhost : btnPrimary}>
+                      {ev.soldOut ? "販売中に戻す" : "SOLD OUTにする"}
+                    </button>
+
+                    <button onClick={() => removeEvent(ev.id)} style={btnDanger}>
+                      削除
+                    </button>
                   </div>
                 </div>
-
-                {/* ボタン（囲い付き） */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 8, flexShrink: 0 }}>
-                  <button
-                    onClick={() => moveUp(idx)}
-                    disabled={idx === 0}
-                    style={{ ...btnGhost, ...(idx === 0 ? btnDisabled : {}) }}
-                  >
-                    ↑ 上へ
-                  </button>
-
-                  <button
-                    onClick={() => moveDown(idx)}
-                    disabled={idx === events.length - 1}
-                    style={{
-                      ...btnGhost,
-                      ...(idx === events.length - 1 ? btnDisabled : {}),
-                    }}
-                  >
-                    ↓ 下へ
-                  </button>
-
-                  <button
-                    onClick={() => toggleSoldOut(ev.id, Boolean(ev.soldOut))}
-                    style={ev.soldOut ? btnGhost : btnPrimary}
-                  >
-                    {ev.soldOut ? "販売中に戻す" : "SOLD OUTにする"}
-                  </button>
-
-                  <button onClick={() => removeEvent(ev.id)} style={btnDanger}>
-                    削除
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>
 
-      {/* 予約（公演ごとにまとめて表示） */}
+      {/* 予約（公演ごと：eventIdで追従） */}
       <section style={{ marginTop: 24, padding: 16, border: "1px solid #ddd", borderRadius: 12 }}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
           <h2>予約一覧（公演ごと）</h2>
@@ -391,7 +475,7 @@ export default function AdminPage() {
         ) : (
           <div style={{ display: "grid", gap: 14, marginTop: 12 }}>
             {events.map((ev) => {
-              const list = reservationsByEvent.get(ev.name) ?? [];
+              const list = reservationsByEventId.get(ev.id) ?? [];
               const sum = list.reduce((s, r) => s + (r.quantity || 0), 0);
 
               return (
@@ -405,7 +489,7 @@ export default function AdminPage() {
                   }}
                 >
                   <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-                    <div style={{ fontWeight: 900 }}>{ev.name}</div>
+                    <div style={{ fontWeight: 900 }}>{eventMap.get(ev.id)?.name ?? ev.name}</div>
                     <div style={{ color: "#374151" }}>
                       合計 <strong>{sum}</strong> 枚 ／ {list.length} 件
                     </div>
@@ -445,6 +529,50 @@ export default function AdminPage() {
                 </div>
               );
             })}
+
+            {/* 古い予約（eventIdなし） */}
+            {legacyReservations.length > 0 && (
+              <div
+                style={{
+                  border: "1px solid #fde68a",
+                  borderRadius: 12,
+                  padding: 14,
+                  background: "#fffbeb",
+                }}
+              >
+                <div style={{ fontWeight: 900, marginBottom: 8 }}>未紐づけ予約（古い予約データ）</div>
+                <div style={{ display: "grid", gap: 8 }}>
+                  {legacyReservations.map((r) => (
+                    <div
+                      key={r.id}
+                      style={{
+                        border: "1px solid #f3f4f6",
+                        borderRadius: 12,
+                        padding: 10,
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        gap: 12,
+                        background: "#fff",
+                      }}
+                    >
+                      <div>
+                        <strong>{r.name}</strong>
+                        <span style={{ marginLeft: 8, color: "#374151", fontWeight: 700 }}>
+                          ／ {r.quantity}枚
+                        </span>
+                        <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>
+                          公演（旧）：{r.event ?? "（不明）"}
+                        </div>
+                      </div>
+                      <button onClick={() => removeReservation(r.id)} style={btnDanger}>
+                        削除
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </section>

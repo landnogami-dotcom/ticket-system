@@ -9,7 +9,7 @@ type EventItem = {
   id: string;
   name: string;
   soldOut?: boolean;
-  order?: number; // 並び順（管理画面で入れてる想定）
+  order?: number;
 };
 
 export default function Home() {
@@ -23,7 +23,6 @@ export default function Home() {
   // 🔥 公演取得（order昇順）
   useEffect(() => {
     const fetchEvents = async () => {
-      // order が無い既存データも混ざる可能性があるので、後で並べ替えで保険かける
       const snap = await getDocs(query(collection(db, "events"), orderBy("order", "asc")));
 
       const list: EventItem[] = snap.docs.map((d) => {
@@ -37,13 +36,7 @@ export default function Home() {
         };
       });
 
-      // 念のため（order未設定は最後に回す）
-      list.sort((a, b) => {
-        const ao = a.order ?? 999999;
-        const bo = b.order ?? 999999;
-        return ao - bo;
-      });
-
+      list.sort((a, b) => (a.order ?? 999999) - (b.order ?? 999999));
       setEvents(list);
     };
 
@@ -56,16 +49,16 @@ export default function Home() {
     if (!name.trim()) return alert("名前を入力してください");
     if (!selectedEvent) return alert("公演を選択してください");
     if (selectedEvent.soldOut) return alert("申し訳ありません。この公演はソールドアウトです。");
-    if (!Number.isFinite(quantity) || quantity < 1) return alert("枚数は1以上で入力してください");
+    if (!Number.isFinite(quantity) || quantity < 1) return alert("枚数は1以上を選択してください");
 
     setLoading(true);
     try {
       await addReservation({
         name: name.trim(),
-        event: selectedEvent.name,
+        eventId: selectedEvent.id, // ✅ eventIdで保存
         quantity,
       });
-      setSuccess(true); // ✅ ここで完了画面へ
+      setSuccess(true);
     } catch (e: any) {
       alert("エラー: " + (e?.message ?? e));
     } finally {
@@ -73,7 +66,7 @@ export default function Home() {
     }
   };
 
-  // ✅ 予約完了画面（おしゃれ版）
+  // ✅ 完了画面
   if (success) {
     return (
       <div
@@ -132,9 +125,7 @@ export default function Home() {
           >
             <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
               <span style={{ color: "#6b7280" }}>公演</span>
-              <span style={{ fontWeight: 700, color: "#111827" }}>
-                {selectedEvent?.name ?? ""}
-              </span>
+              <span style={{ fontWeight: 700, color: "#111827" }}>{selectedEvent?.name ?? ""}</span>
             </div>
 
             <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginTop: 10 }}>
@@ -173,7 +164,7 @@ export default function Home() {
     );
   }
 
-  // ✅ フォーム（おしゃれ＆スマホ見やすい）
+  // ✅ フォーム（そのままのデザイン）
   const labelStyle: React.CSSProperties = {
     fontSize: 13,
     color: "#374151",
@@ -189,7 +180,7 @@ export default function Home() {
     background: "#f9fafb",
     outline: "none",
     fontSize: 16,
-    color: "#111827", // ← 入力文字を濃く
+    color: "#111827",
   };
 
   const helpStyle: React.CSSProperties = {
@@ -229,12 +220,7 @@ export default function Home() {
         {/* 名前 */}
         <div style={{ marginTop: 14 }}>
           <div style={labelStyle}>お名前</div>
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder=""
-            style={inputStyle}
-          />
+          <input value={name} onChange={(e) => setName(e.target.value)} style={inputStyle} />
           <div style={helpStyle}>※ フルネームがおすすめ</div>
         </div>
 
@@ -260,24 +246,18 @@ export default function Home() {
           )}
         </div>
 
-        {/* 枚数 */}
-<div style={{ marginTop: 14 }}>
-  <div style={labelStyle}>枚数</div>
-
-  <select
-    value={quantity}
-    onChange={(e) => setQuantity(Number(e.target.value))}
-    style={inputStyle}
-  >
-    {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
-      <option key={n} value={n}>
-        {n}
-      </option>
-    ))}
-  </select>
-
-  <div style={helpStyle}>※ 1〜10枚まで選択できます</div>
-</div>
+        {/* 枚数（selectに変更：02問題回避） */}
+        <div style={{ marginTop: 14 }}>
+          <div style={labelStyle}>枚数</div>
+          <select value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} style={inputStyle}>
+            {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </select>
+          <div style={helpStyle}>※ 1〜10枚まで選択できます</div>
+        </div>
 
         {/* 送信 */}
         <button
