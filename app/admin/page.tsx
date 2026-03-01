@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { db } from "@/lib/firebase";
 import {
   collection,
@@ -23,16 +23,18 @@ type EventItem = {
 type ReservationItem = {
   id: string;
   name: string;
-  event: string;
+  event: string; // ← 公演名が入ってる想定
   quantity: number;
   createdAt?: any;
 };
 
 export default function AdminPage() {
+  // 公演
   const [newEventName, setNewEventName] = useState("");
   const [events, setEvents] = useState<EventItem[]>([]);
   const [eventLoading, setEventLoading] = useState(false);
 
+  // 予約
   const [reservations, setReservations] = useState<ReservationItem[]>([]);
   const [resLoading, setResLoading] = useState(false);
 
@@ -40,7 +42,6 @@ export default function AdminPage() {
   const fetchEvents = async () => {
     const q = query(collection(db, "events"), orderBy("order", "asc"));
     const snap = await getDocs(q);
-
     const list = snap.docs.map((d) => {
       const data: any = d.data();
       return {
@@ -50,7 +51,6 @@ export default function AdminPage() {
         order: Number(data.order ?? 0),
       };
     });
-
     setEvents(list);
   };
 
@@ -60,7 +60,6 @@ export default function AdminPage() {
     try {
       const q = query(collection(db, "reservations"), orderBy("createdAt", "desc"));
       const snap = await getDocs(q);
-
       const list = snap.docs.map((d) => {
         const data: any = d.data();
         return {
@@ -71,7 +70,6 @@ export default function AdminPage() {
           createdAt: data.createdAt,
         };
       });
-
       setReservations(list);
     } finally {
       setResLoading(false);
@@ -83,7 +81,7 @@ export default function AdminPage() {
     fetchReservations();
   }, []);
 
-  // ---- 公演追加
+  // ---- 公演追加（末尾に追加）
   const addEvent = async (e: FormEvent) => {
     e.preventDefault();
     if (!newEventName.trim()) return alert("公演名を入力してください");
@@ -91,13 +89,11 @@ export default function AdminPage() {
     setEventLoading(true);
     try {
       const maxOrder = events.reduce((m, ev) => Math.max(m, ev.order ?? 0), 0);
-
       await addDoc(collection(db, "events"), {
         name: newEventName.trim(),
         soldOut: false,
         order: maxOrder + 1,
       });
-
       setNewEventName("");
       await fetchEvents();
       alert("公演を追加しました！");
@@ -118,15 +114,13 @@ export default function AdminPage() {
     }
   };
 
-  // ---- 並び替え
+  // ---- 並び順入れ替え（↑↓）
   const swapOrder = async (a: EventItem, b: EventItem) => {
     try {
       const aOrder = Number(a.order ?? 0);
       const bOrder = Number(b.order ?? 0);
-
       await updateDoc(doc(db, "events", a.id), { order: bOrder });
       await updateDoc(doc(db, "events", b.id), { order: aOrder });
-
       await fetchEvents();
     } catch (err: any) {
       alert("並び替えエラー: " + err.message);
@@ -143,6 +137,7 @@ export default function AdminPage() {
     await swapOrder(events[index], events[index + 1]);
   };
 
+  // ---- 公演削除
   const removeEvent = async (id: string) => {
     if (!confirm("この公演を削除しますか？")) return;
     try {
@@ -153,6 +148,7 @@ export default function AdminPage() {
     }
   };
 
+  // ---- 予約削除
   const removeReservation = async (id: string) => {
     if (!confirm("この予約を削除しますか？")) return;
     try {
@@ -163,10 +159,24 @@ export default function AdminPage() {
     }
   };
 
-  const totalTickets = reservations.reduce((sum, r) => sum + (r.quantity || 0), 0);
+  // ---- 公演ごとに予約をまとめる（event名でグループ化）
+  const reservationsByEvent = useMemo(() => {
+    const map = new Map<string, ReservationItem[]>();
+    for (const r of reservations) {
+      const key = r.event || "（公演名なし）";
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(r);
+    }
+    return map;
+  }, [reservations]);
+
+  const totalTicketsAll = useMemo(
+    () => reservations.reduce((sum, r) => sum + (r.quantity || 0), 0),
+    [reservations]
+  );
 
   return (
-    <main style={{ maxWidth: 760, margin: "40px auto", padding: 16 }}>
+    <main style={{ maxWidth: 820, margin: "40px auto", padding: 16 }}>
       <h1>管理画面</h1>
 
       {/* 公演管理 */}
@@ -202,13 +212,8 @@ export default function AdminPage() {
                   gap: 14,
                 }}
               >
-                {/* 🔥 2行まで表示（縦長防止） */}
-                <div
-                  style={{
-                    flex: 1,
-                    minWidth: 0,
-                  }}
-                >
+                {/* 2行まで表示 */}
+                <div style={{ flex: 1, minWidth: 0 }}>
                   <div
                     style={{
                       fontWeight: 700,
@@ -224,7 +229,7 @@ export default function AdminPage() {
                     {ev.name}
                   </div>
 
-                  <div style={{ marginTop: 6 }}>
+                  <div style={{ marginTop: 6, display: "flex", gap: 8, flexWrap: "wrap" }}>
                     {ev.soldOut ? (
                       <span
                         style={{
@@ -252,18 +257,25 @@ export default function AdminPage() {
                         販売中
                       </span>
                     )}
+
+                    {/* この公演の予約合計 */}
+                    <span
+                      style={{
+                        padding: "3px 8px",
+                        borderRadius: 999,
+                        background: "#f3f4f6",
+                        color: "#374151",
+                        fontSize: 12,
+                        border: "1px solid #e5e7eb",
+                      }}
+                    >
+                      予約合計：{reservationsByEvent.get(ev.name)?.reduce((s, r) => s + r.quantity, 0) ?? 0} 枚
+                    </span>
                   </div>
                 </div>
 
-                {/* ボタン群 */}
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 6,
-                    flexShrink: 0,
-                  }}
-                >
+                {/* ボタン */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
                   <button onClick={() => moveUp(idx)} disabled={idx === 0}>
                     ↑
                   </button>
@@ -281,36 +293,78 @@ export default function AdminPage() {
         )}
       </section>
 
-      {/* 予約一覧 */}
+      {/* 予約（公演ごとにまとめて表示） */}
       <section style={{ marginTop: 24, padding: 16, border: "1px solid #ddd", borderRadius: 12 }}>
-        <h2>予約一覧</h2>
-
-        <div style={{ marginBottom: 10 }}>合計枚数：{totalTickets}</div>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+          <h2>予約一覧（公演ごと）</h2>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <button onClick={fetchReservations} style={{ padding: "6px 10px" }}>
+              更新
+            </button>
+            <div style={{ padding: "6px 10px", border: "1px solid #ddd", borderRadius: 8 }}>
+              全体合計：{totalTicketsAll} 枚
+            </div>
+          </div>
+        </div>
 
         {resLoading ? (
           <p>読み込み中...</p>
         ) : reservations.length === 0 ? (
           <p style={{ opacity: 0.7 }}>予約がありません</p>
         ) : (
-          <div style={{ display: "grid", gap: 10 }}>
-            {reservations.map((r) => (
-              <div
-                key={r.id}
-                style={{
-                  border: "1px solid #e5e7eb",
-                  borderRadius: 12,
-                  padding: 12,
-                  display: "flex",
-                  justifyContent: "space-between",
-                }}
-              >
-                <div>
-                  <strong>{r.name}</strong> ／ {r.quantity}枚
-                  <div style={{ fontSize: 14, opacity: 0.8 }}>{r.event}</div>
+          <div style={{ display: "grid", gap: 14, marginTop: 12 }}>
+            {events.map((ev) => {
+              const list = reservationsByEvent.get(ev.name) ?? [];
+              const sum = list.reduce((s, r) => s + (r.quantity || 0), 0);
+
+              return (
+                <div
+                  key={ev.id}
+                  style={{
+                    border: "1px solid #e5e7eb",
+                    borderRadius: 12,
+                    padding: 14,
+                    background: "#fff",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                    <div style={{ fontWeight: 800 }}>{ev.name}</div>
+                    <div style={{ color: "#374151" }}>
+                      合計 <strong>{sum}</strong> 枚 ／ {list.length} 件
+                    </div>
+                  </div>
+
+                  {list.length === 0 ? (
+                    <div style={{ marginTop: 10, opacity: 0.7 }}>この公演の予約はまだありません</div>
+                  ) : (
+                    <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
+                      {list.map((r) => (
+                        <div
+                          key={r.id}
+                          style={{
+                            border: "1px solid #eee",
+                            borderRadius: 10,
+                            padding: 10,
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            gap: 12,
+                          }}
+                        >
+                          <div>
+                            <strong>{r.name}</strong>
+                            <span style={{ marginLeft: 8, color: "#374151" }}>／ {r.quantity}枚</span>
+                          </div>
+                          <button onClick={() => removeReservation(r.id)} style={{ padding: "6px 10px" }}>
+                            削除
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <button onClick={() => removeReservation(r.id)}>削除</button>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>
