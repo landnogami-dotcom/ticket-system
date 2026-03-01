@@ -13,14 +13,14 @@ import {
   updateDoc,
 } from "firebase/firestore";
 
-type EventItem = { id: string; name: string; soldOut?: boolean };
+type EventItem = { id: string; name: string; soldOut?: boolean; order?: number };
 
 type ReservationItem = {
   id: string;
   name: string;
   event: string;
   quantity: number;
-  createdAt?: any; // Timestampの型は雑でOK（表示だけ）
+  createdAt?: any;
 };
 
 export default function AdminPage() {
@@ -33,15 +33,17 @@ export default function AdminPage() {
   const [reservations, setReservations] = useState<ReservationItem[]>([]);
   const [resLoading, setResLoading] = useState(false);
 
-  // ---- 公演一覧取得
+  // ---- 公演一覧取得（order順）
   const fetchEvents = async () => {
-    const snap = await getDocs(collection(db, "events"));
+    const q = query(collection(db, "events"), orderBy("order", "asc"));
+    const snap = await getDocs(q);
     const list = snap.docs.map((d) => {
       const data: any = d.data();
       return {
         id: d.id,
         name: String(data.name ?? ""),
         soldOut: Boolean(data.soldOut ?? false),
+        order: Number(data.order ?? 0),
       };
     });
     setEvents(list);
@@ -74,16 +76,18 @@ export default function AdminPage() {
     fetchReservations();
   }, []);
 
-  // ---- 公演追加（soldOutは必ずfalseで作る）
+  // ---- 公演追加（末尾に追加されるように order を最大+1）
   const addEvent = async (e: FormEvent) => {
     e.preventDefault();
     if (!newEventName.trim()) return alert("公演名を入力してください");
 
     setEventLoading(true);
     try {
+      const maxOrder = events.reduce((m, ev) => Math.max(m, ev.order ?? 0), 0);
       await addDoc(collection(db, "events"), {
         name: newEventName.trim(),
         soldOut: false,
+        order: maxOrder + 1,
       });
       setNewEventName("");
       await fetchEvents();
@@ -103,6 +107,29 @@ export default function AdminPage() {
     } catch (err: any) {
       alert("更新エラー: " + err.message);
     }
+  };
+
+  // ---- 並び順入れ替え（↑↓）
+  const swapOrder = async (a: EventItem, b: EventItem) => {
+    try {
+      const aOrder = Number(a.order ?? 0);
+      const bOrder = Number(b.order ?? 0);
+      await updateDoc(doc(db, "events", a.id), { order: bOrder });
+      await updateDoc(doc(db, "events", b.id), { order: aOrder });
+      await fetchEvents();
+    } catch (err: any) {
+      alert("並び替えエラー: " + err.message);
+    }
+  };
+
+  const moveUp = async (index: number) => {
+    if (index <= 0) return;
+    await swapOrder(events[index], events[index - 1]);
+  };
+
+  const moveDown = async (index: number) => {
+    if (index >= events.length - 1) return;
+    await swapOrder(events[index], events[index + 1]);
   };
 
   // ---- 公演削除
@@ -154,7 +181,7 @@ export default function AdminPage() {
           <p style={{ opacity: 0.7 }}>まだ公演がありません</p>
         ) : (
           <div style={{ display: "grid", gap: 10 }}>
-            {events.map((ev) => (
+            {events.map((ev, idx) => (
               <div
                 key={ev.id}
                 style={{
@@ -199,10 +226,28 @@ export default function AdminPage() {
                         販売中
                       </span>
                     )}
+                    <span style={{ marginLeft: 10, fontSize: 12, color: "#6b7280" }}>
+                      order: {ev.order ?? 0}
+                    </span>
                   </div>
                 </div>
 
-                <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                <div style={{ display: "flex", gap: 8, flexShrink: 0, flexWrap: "wrap" }}>
+                  <button
+                    onClick={() => moveUp(idx)}
+                    disabled={idx === 0}
+                    style={{ padding: "6px 10px" }}
+                  >
+                    ↑
+                  </button>
+                  <button
+                    onClick={() => moveDown(idx)}
+                    disabled={idx === events.length - 1}
+                    style={{ padding: "6px 10px" }}
+                  >
+                    ↓
+                  </button>
+
                   <button
                     onClick={() => toggleSoldOut(ev.id, Boolean(ev.soldOut))}
                     style={{

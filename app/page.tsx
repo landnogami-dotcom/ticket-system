@@ -1,11 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { addReservation } from "@/lib/reservation";
 import { db } from "@/lib/firebase";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, query, orderBy } from "firebase/firestore";
 
-type EventItem = { id: string; name: string; soldOut?: boolean };
+type EventItem = {
+  id: string;
+  name: string;
+  soldOut?: boolean;
+  order?: number; // 並び順（管理画面で入れてる想定）
+};
 
 export default function Home() {
   const [name, setName] = useState("");
@@ -15,41 +20,60 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
+  // 🔥 公演取得（order昇順）
   useEffect(() => {
     const fetchEvents = async () => {
-      const snap = await getDocs(collection(db, "events"));
+      // order が無い既存データも混ざる可能性があるので、後で並べ替えで保険かける
+      const snap = await getDocs(query(collection(db, "events"), orderBy("order", "asc")));
+
       const list: EventItem[] = snap.docs.map((d) => {
         const data: any = d.data();
+        const ord = data.order;
         return {
           id: d.id,
           name: String(data.name ?? ""),
           soldOut: Boolean(data.soldOut ?? false),
+          order: typeof ord === "number" ? ord : undefined,
         };
       });
+
+      // 念のため（order未設定は最後に回す）
+      list.sort((a, b) => {
+        const ao = a.order ?? 999999;
+        const bo = b.order ?? 999999;
+        return ao - bo;
+      });
+
       setEvents(list);
     };
+
     fetchEvents();
   }, []);
 
   const selectedEvent = events.find((e) => e.id === eventId);
 
   const handleSubmit = async () => {
-    if (!name) return alert("名前を入力してください");
+    if (!name.trim()) return alert("名前を入力してください");
     if (!selectedEvent) return alert("公演を選択してください");
     if (selectedEvent.soldOut) return alert("申し訳ありません。この公演はソールドアウトです。");
+    if (!Number.isFinite(quantity) || quantity < 1) return alert("枚数は1以上で入力してください");
 
     setLoading(true);
     try {
-      await addReservation({ name, event: selectedEvent.name, quantity });
-      setSuccess(true);
+      await addReservation({
+        name: name.trim(),
+        event: selectedEvent.name,
+        quantity,
+      });
+      setSuccess(true); // ✅ ここで完了画面へ
     } catch (e: any) {
-      alert("エラー: " + e.message);
+      alert("エラー: " + (e?.message ?? e));
     } finally {
       setLoading(false);
     }
   };
 
-  // ✅ 完了画面（そのまま）
+  // ✅ 予約完了画面（おしゃれ版）
   if (success) {
     return (
       <div
@@ -108,17 +132,12 @@ export default function Home() {
           >
             <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
               <span style={{ color: "#6b7280" }}>公演</span>
-              <span style={{ fontWeight: 700, color: "#111827" }}>{selectedEvent?.name ?? ""}</span>
+              <span style={{ fontWeight: 700, color: "#111827" }}>
+                {selectedEvent?.name ?? ""}
+              </span>
             </div>
 
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                gap: 12,
-                marginTop: 10,
-              }}
-            >
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginTop: 10 }}>
               <span style={{ color: "#6b7280" }}>枚数</span>
               <span style={{ fontWeight: 700, color: "#111827" }}>{quantity} 枚</span>
             </div>
@@ -163,15 +182,15 @@ export default function Home() {
   };
 
   const inputStyle: React.CSSProperties = {
-  width: "100%",
-  padding: "12px 12px",
-  borderRadius: 12,
-  border: "1px solid #d1d5db",
-  background: "#f9fafb",
-  outline: "none",
-  fontSize: 16,
-  color: "#111827",   // ← これを追加（濃い文字色）
-};
+    width: "100%",
+    padding: "12px 12px",
+    borderRadius: 12,
+    border: "1px solid #d1d5db",
+    background: "#f9fafb",
+    outline: "none",
+    fontSize: 16,
+    color: "#111827", // ← 入力文字を濃く
+  };
 
   const helpStyle: React.CSSProperties = {
     marginTop: 6,
@@ -211,22 +230,18 @@ export default function Home() {
         <div style={{ marginTop: 14 }}>
           <div style={labelStyle}>お名前</div>
           <input
-  value={name}
-  onChange={(e) => setName(e.target.value)}
-  placeholder=""
-  style={inputStyle}
-/>
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder=""
+            style={inputStyle}
+          />
           <div style={helpStyle}>※ フルネームがおすすめ</div>
         </div>
 
         {/* 公演 */}
         <div style={{ marginTop: 14 }}>
           <div style={labelStyle}>公演</div>
-          <select
-            value={eventId}
-            onChange={(e) => setEventId(e.target.value)}
-            style={inputStyle}
-          >
+          <select value={eventId} onChange={(e) => setEventId(e.target.value)} style={inputStyle}>
             <option value="">選択してください</option>
             {events.map((ev) => (
               <option key={ev.id} value={ev.id} disabled={Boolean(ev.soldOut)}>
@@ -284,9 +299,6 @@ export default function Home() {
           当日は受付にてお名前をお伝えください。
         </div>
       </div>
-
-      {/* フォーカス時に枠をくっきりさせる小技（CSSを使わずinlineで） */}
-      <div style={{ display: "none" }} />
     </div>
   );
 }
