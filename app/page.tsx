@@ -261,17 +261,23 @@ export default function Home() {
         </div>
 
         {/* 枚数 */}
-        <div style={{ marginTop: 14 }}>
-          <div style={labelStyle}>枚数</div>
-          <input
-            type="number"
-            value={quantity}
-            onChange={(e) => setQuantity(Number(e.target.value))}
-            style={inputStyle}
-            min={1}
-          />
-          <div style={helpStyle}>※ 1〜で入力</div>
-        </div>
+<div style={{ marginTop: 14 }}>
+  <div style={labelStyle}>枚数</div>
+
+  <select
+    value={quantity}
+    onChange={(e) => setQuantity(Number(e.target.value))}
+    style={inputStyle}
+  >
+    {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+      <option key={n} value={n}>
+        {n}
+      </option>
+    ))}
+  </select>
+
+  <div style={helpStyle}>※ 1〜10枚まで選択できます</div>
+</div>
 
         {/* 送信 */}
         <button
